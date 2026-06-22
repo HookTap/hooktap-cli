@@ -19,8 +19,17 @@ echo "Staging deploy is live" | hooktap send --title "Deploy"
 
 ## Install
 
+**macOS / Linux** — Homebrew:
+
 ```bash
 brew install HookTap/tap/hooktap
+```
+
+**Windows** — Scoop:
+
+```powershell
+scoop bucket add hooktap https://github.com/HookTap/scoop-bucket
+scoop install hooktap
 ```
 
 <details>

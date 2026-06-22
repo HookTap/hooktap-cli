@@ -18,6 +18,7 @@ builds:
     goos:
       - darwin
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
@@ -31,6 +32,11 @@ archives:
   - id: hooktap
     formats:
       - tar.gz
+    # Windows users expect a .zip (and it's what Scoop fetches).
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
@@ -72,6 +78,24 @@ homebrew_casks:
             system_command "/usr/bin/xattr",
               args: ["-dr", "com.apple.quarantine", "#{staged_path}/hooktap"]
           end
+
+# Publish a Scoop manifest so Windows users can:
+#   scoop bucket add hooktap https://github.com/HookTap/scoop-bucket
+#   scoop install hooktap
+scoops:
+  - name: hooktap
+    repository:
+      owner: hooktap
+      name: scoop-bucket
+      branch: main
+      # Reuses the same PAT — it has repo scope across the HookTap org.
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://hooktap.me"
+    description: "Send webhook events to the HookTap app from your terminal"
+    license: "MIT"
+    commit_author:
+      name: hooktap-bot
+      email: bot@hooktap.me
 
 release:
   draft: false
