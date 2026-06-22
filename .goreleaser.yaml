@@ -44,10 +44,13 @@ changelog:
       - "^test:"
       - "^chore:"
 
-# Publish a Homebrew formula to the tap so users can:
+# Publish a Homebrew cask to the tap so users can:
 #   brew install hooktap/tap/hooktap
-brews:
+# (casks replaced the deprecated `brews` formula block in GoReleaser v2.)
+homebrew_casks:
   - name: hooktap
+    binaries:
+      - hooktap
     repository:
       owner: hooktap
       name: homebrew-tap
@@ -60,10 +63,15 @@ brews:
     commit_author:
       name: hooktap-bot
       email: bot@hooktap.me
-    install: |
-      bin.install "hooktap"
-    test: |
-      system "#{bin}/hooktap", "--version"
+    # The binaries are not notarised; strip the quarantine flag on install so
+    # Gatekeeper doesn't block the CLI on first run.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+              args: ["-dr", "com.apple.quarantine", "#{staged_path}/hooktap"]
+          end
 
 release:
   draft: false
