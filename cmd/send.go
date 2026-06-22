@@ -62,11 +62,7 @@ func newSendCmd() *cobra.Command {
 					return fmt.Errorf("%w: --raw stdin is not valid JSON", errUsage)
 				}
 				resp, err := c.SendRaw(context.Background(), s.hookID, stdin)
-				if err != nil {
-					return err
-				}
-				printSent(cmd.ErrOrStderr(), resp)
-				return nil
+				return report(cmd, resp, err)
 			}
 
 			// ── Structured mode ───────────────────────────────────────────────
@@ -85,11 +81,7 @@ func newSendCmd() *cobra.Command {
 				Title: title,
 				Body:  body,
 			})
-			if err != nil {
-				return err
-			}
-			printSent(cmd.ErrOrStderr(), resp)
-			return nil
+			return report(cmd, resp, err)
 		},
 	}
 
@@ -97,7 +89,28 @@ func newSendCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&flagBody, "body", "b", "", "event body text (overrides stdin)")
 	cmd.Flags().StringVar(&flagTitle, "title", "", "event title (alternative to the positional argument)")
 	cmd.Flags().BoolVar(&flagRaw, "raw", false, "send a complete JSON body read from stdin verbatim")
+
+	// Shell completion for --type: the three valid event types.
+	_ = cmd.RegisterFlagCompletionFunc("type", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		return []string{client.TypePush, client.TypeFeed, client.TypeWidget}, cobra.ShellCompDirectiveNoFileComp
+	})
 	return cmd
+}
+
+// report writes the outcome of a send. With --json the raw server response
+// goes to stdout (pipe-friendly) even on failure, and the send error — if any —
+// is still returned so the exit code reflects it. Without --json a short
+// confirmation goes to stderr on success, keeping stdout clean.
+func report(cmd *cobra.Command, resp *client.Response, sendErr error) error {
+	if flagJSON && resp != nil && len(resp.Raw) > 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), string(resp.Raw))
+		return sendErr
+	}
+	if sendErr != nil {
+		return sendErr
+	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "✓ sent (%s) event %s\n", resp.Type, resp.EventID)
+	return nil
 }
 
 // readStdin returns piped/redirected input. When stdin is an interactive
@@ -149,8 +162,4 @@ func defaultTitle() string {
 		return "Notification from " + h
 	}
 	return "Webhook Event"
-}
-
-func printSent(w io.Writer, resp *client.Response) {
-	fmt.Fprintf(w, "✓ sent (%s) event %s\n", resp.Type, resp.EventID)
 }

@@ -59,6 +59,17 @@ type Response struct {
 	NotificationSent   bool   `json:"notificationSent"`
 	NotificationsSent  int    `json:"notificationsSent"`
 	NotificationsTotal int    `json:"notificationsTotal"`
+
+	// Raw is the verbatim response body, kept so --json can emit exactly what
+	// the server returned (including fields not modelled above).
+	Raw json.RawMessage `json:"-"`
+}
+
+// Health is the decoded JSON from GET /health.
+type Health struct {
+	Status    string `json:"status"`
+	Service   string `json:"service"`
+	Timestamp string `json:"timestamp"`
 }
 
 // WebhookURL builds the full POST URL for a given webhook id.
@@ -87,6 +98,29 @@ func (c *Client) SendRaw(ctx context.Context, hookID string, raw []byte) (*Respo
 	return c.post(ctx, hookID, raw)
 }
 
+// Health calls GET /health, the liveness probe of the HookTap service.
+func (c *Client) Health(ctx context.Context) (*Health, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/health", nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("hooktap: health check failed (HTTP %d)", resp.StatusCode)
+	}
+	var h Health
+	if err := json.Unmarshal(raw, &h); err != nil {
+		return nil, fmt.Errorf("decode health response: %w", err)
+	}
+	return &h, nil
+}
+
 // post sends body as application/json and maps the HTTP status to a Response or
 // sentinel error.
 func (c *Client) post(ctx context.Context, hookID string, body []byte) (*Response, error) {
@@ -107,6 +141,7 @@ func (c *Client) post(ctx context.Context, hookID string, body []byte) (*Respons
 	// Decode best-effort; the body may be empty or non-JSON on edge cases.
 	var out Response
 	_ = json.Unmarshal(raw, &out)
+	out.Raw = json.RawMessage(raw)
 
 	switch resp.StatusCode {
 	case http.StatusOK:

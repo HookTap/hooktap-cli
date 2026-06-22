@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/hooktap/hooktap-cli/internal/client"
+	"github.com/hooktap/hooktap-cli/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,7 @@ var (
 	flagURL     string // override base URL (staging/self-host)
 	flagHook    string // webhook id (or full url)
 	flagProfile string // config profile to use
+	flagJSON    bool   // print raw JSON responses to stdout
 )
 
 // BuildInfo carries version metadata from main (set by GoReleaser).
@@ -44,9 +46,20 @@ func newRootCmd(b BuildInfo) *cobra.Command {
 	root.PersistentFlags().StringVar(&flagURL, "url", "", "base URL override (default https://hooks.hooktap.me)")
 	root.PersistentFlags().StringVar(&flagHook, "hook", "", "webhook id (or HOOKTAP_HOOK_ID / HOOKTAP_WEBHOOK_URL)")
 	root.PersistentFlags().StringVarP(&flagProfile, "profile", "p", "", "config profile to use (default: the file's default profile)")
+	root.PersistentFlags().BoolVar(&flagJSON, "json", false, "print the raw JSON response to stdout")
+
+	// Shell completion for --profile: offer the configured profile names.
+	_ = root.RegisterFlagCompletionFunc("profile", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+		cfg, err := config.Load()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return cfg.ProfileNames(), cobra.ShellCompDirectiveNoFileComp
+	})
 
 	root.AddCommand(newSendCmd())
 	root.AddCommand(newConfigCmd())
+	root.AddCommand(newPingCmd())
 	return root
 }
 
