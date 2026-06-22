@@ -1,0 +1,10 @@
+# Build output
+/hooktap
+/dist/
+
+# Go
+*.test
+*.out
+
+# Local env
+.env

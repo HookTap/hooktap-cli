@@ -1,0 +1,70 @@
+# GoReleaser config for the HookTap CLI.
+# Build & publish:  git tag v0.1.0 && git push origin v0.1.0  → GitHub Action runs `goreleaser release`.
+# Validate locally:  goreleaser check  /  goreleaser build --snapshot --clean
+version: 2
+
+project_name: hooktap
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: hooktap
+    main: .
+    binary: hooktap
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+      - -X main.date={{ .CommitDate }}
+
+archives:
+  - id: hooktap
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+# Publish a Homebrew formula to the tap so users can:
+#   brew install hooktap/tap/hooktap
+brews:
+  - name: hooktap
+    repository:
+      owner: hooktap
+      name: homebrew-tap
+      branch: main
+      # A PAT with repo scope on the tap repo, exposed to the release workflow.
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://hooktap.me"
+    description: "Send webhook events to the HookTap app from your terminal"
+    license: "MIT"
+    commit_author:
+      name: hooktap-bot
+      email: bot@hooktap.me
+    install: |
+      bin.install "hooktap"
+    test: |
+      system "#{bin}/hooktap", "--version"
+
+release:
+  draft: false
+  prerelease: auto
