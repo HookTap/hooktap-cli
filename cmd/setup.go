@@ -14,16 +14,19 @@ import (
 
 func newSetupCmd() *cobra.Command {
 	var (
-		setupName   string
-		setupHook   string
-		setupType   string
-		setupNoTest bool
+		setupName    string
+		setupHook    string
+		setupCode    string
+		setupPairURL string
+		setupType    string
+		setupNoTest  bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Configure HookTap with a guided first-run wizard",
 		Example: `  hooktap setup
+  hooktap setup --code 123456
   hooktap setup --name ci --hook https://hooks.hooktap.me/webhook/YOUR_ID --type push`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -32,16 +35,26 @@ func newSetupCmd() *cobra.Command {
 				return err
 			}
 
-			reader := bufio.NewReader(cmd.InOrStdin())
+			hook := strings.TrimSpace(firstNonEmpty(setupHook, flagHook))
 			name := strings.TrimSpace(firstNonEmpty(setupName, flagProfile))
+			if setupCode != "" {
+				resp, err := client.ResolvePairingCode(context.Background(), setupPairURL, strings.TrimSpace(setupCode))
+				if err != nil {
+					return err
+				}
+				hook = resp.WebhookURL
+				if name == "" && resp.Name != "" {
+					name = resp.Name
+				}
+			}
+
+			reader := bufio.NewReader(cmd.InOrStdin())
 			if name == "" {
 				name = prompt(reader, cmd.OutOrStdout(), "Profile name", config.DefaultProfileName)
 			}
 			if name == "" {
 				name = config.DefaultProfileName
 			}
-
-			hook := strings.TrimSpace(firstNonEmpty(setupHook, flagHook))
 			if hook == "" {
 				hook = prompt(reader, cmd.OutOrStdout(), "Webhook id or full URL", "")
 			}
@@ -101,6 +114,8 @@ func newSetupCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&setupName, "name", "", "profile name to create or update")
 	cmd.Flags().StringVar(&setupHook, "hook", "", "webhook id or full URL")
+	cmd.Flags().StringVar(&setupCode, "code", "", "6-digit pairing code from the HookTap iPhone app")
+	cmd.Flags().StringVar(&setupPairURL, "pair-url", "", "CLI pairing endpoint override")
 	cmd.Flags().StringVarP(&setupType, "type", "t", client.DefaultType, "default event type: push|feed|widget")
 	cmd.Flags().BoolVar(&setupNoTest, "no-test", false, "save configuration without sending a test notification")
 	return cmd

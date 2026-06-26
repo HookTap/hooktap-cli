@@ -52,7 +52,13 @@ go install github.com/hooktap/hooktap-cli@latest
 
 ## Setup
 
-Install [HookTap on the App Store](https://apps.apple.com/app/hooktap/id6670671021) and copy your webhook id (the `YOUR_HOOK_ID` part of `https://hooks.hooktap.me/webhook/YOUR_HOOK_ID`), then save it:
+Install [HookTap on the App Store](https://apps.apple.com/app/hooktap/id6670671021), open the CLI pairing screen, and run the command shown in the app:
+
+```bash
+hooktap setup --code 123456
+```
+
+You can also copy your webhook id manually (the `YOUR_HOOK_ID` part of `https://hooks.hooktap.me/webhook/YOUR_HOOK_ID`) and save it:
 
 ```bash
 hooktap setup

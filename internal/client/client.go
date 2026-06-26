@@ -18,6 +18,7 @@ import (
 // DefaultBaseURL is the production HookTap ingest host. Overridable for
 // staging/self-hosting via the --url flag or HOOKTAP_BASE_URL.
 const DefaultBaseURL = "https://hooks.hooktap.me"
+const DefaultPairingURL = "https://pairclidevice-lizlvozwda-uc.a.run.app"
 
 const defaultTimeout = 10 * time.Second
 
@@ -72,6 +73,15 @@ type Health struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type PairingResponse struct {
+	Success    bool   `json:"success"`
+	UserID     string `json:"userId"`
+	WebhookID  string `json:"webhookId"`
+	WebhookURL string `json:"webhookUrl"`
+	Name       string `json:"name"`
+	Error      string `json:"error"`
+}
+
 // WebhookURL builds the full POST URL for a given webhook id.
 func (c *Client) WebhookURL(hookID string) string {
 	return c.BaseURL + "/webhook/" + hookID
@@ -119,6 +129,40 @@ func (c *Client) Health(ctx context.Context) (*Health, error) {
 		return nil, fmt.Errorf("decode health response: %w", err)
 	}
 	return &h, nil
+}
+
+func ResolvePairingCode(ctx context.Context, endpoint, code string) (*PairingResponse, error) {
+	if endpoint == "" {
+		endpoint = DefaultPairingURL
+	}
+	body, err := json.Marshal(map[string]string{"code": code})
+	if err != nil {
+		return nil, fmt.Errorf("marshal pairing request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build pairing request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: defaultTimeout}).Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send pairing request: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	var out PairingResponse
+	_ = json.Unmarshal(raw, &out)
+	if resp.StatusCode != http.StatusOK {
+		msg := out.Error
+		if msg == "" {
+			msg = strings.TrimSpace(string(raw))
+		}
+		if msg == "" {
+			msg = resp.Status
+		}
+		return &out, fmt.Errorf("hooktap pairing: %s (HTTP %d)", msg, resp.StatusCode)
+	}
+	return &out, nil
 }
 
 // post sends body as application/json and maps the HTTP status to a Response or
