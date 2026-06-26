@@ -19,6 +19,12 @@ echo "Staging deploy is live" | hooktap send --title "Deploy"
 
 ## Install
 
+**macOS / Linux** — curl installer:
+
+```bash
+curl -fsSL https://hooktap.me/install.sh | sh
+```
+
 **macOS / Linux** — Homebrew:
 
 ```bash
@@ -49,15 +55,27 @@ go install github.com/hooktap/hooktap-cli@latest
 Install [HookTap on the App Store](https://apps.apple.com/app/hooktap/id6670671021) and copy your webhook id (the `YOUR_HOOK_ID` part of `https://hooks.hooktap.me/webhook/YOUR_HOOK_ID`), then save it:
 
 ```bash
+hooktap setup
+# or:
 hooktap config set hook_id YOUR_HOOK_ID
 hooktap ping        # ok — hooktap (2026-06-22T07:14:55.993Z)
 ```
+
+`hooktap setup` creates a profile, stores it in the config file, and sends a test notification unless you pass `--no-test`.
 
 ## Usage
 
 ```bash
 # Simplest form — the title is the argument
 hooktap send "Build finished"
+
+# Open the terminal UI
+hooktap
+hooktap tui
+
+# Notify when a command finishes
+hooktap watch -- npm run build
+hooktap watch --title "Deploy" -- make deploy
 
 # Add a body and pick the event type
 hooktap send "CI failed" --body "main branch" --type push
@@ -72,6 +90,30 @@ generate-payload.sh | hooktap send --raw
 # Machine-readable output for scripts
 hooktap send "Order #123" --json | jq .eventId
 ```
+
+## Terminal UI
+
+Run `hooktap` or `hooktap tui` to open the interactive terminal interface:
+
+| Screen | Purpose |
+|--------|---------|
+| Send | Compose and send a push/feed/widget event |
+| Profiles | Inspect configured profiles and the active default |
+| Snippets | Copy-ready examples for scripts and raw JSON |
+| Doctor | Config path, profile count, and basic diagnostics |
+
+Keyboard shortcuts: `1`-`4` switch screens, `Tab` moves between inputs, `Ctrl+T` cycles event types, `Ctrl+S` sends, `q` quits.
+
+## Watch commands
+
+Use `watch` to run any command and receive a notification when it exits:
+
+```bash
+hooktap watch -- npm run build
+hooktap watch --title "Production deploy" -- make deploy
+```
+
+The command output streams normally, and `hooktap watch` exits with the watched command's exit code.
 
 ### Event types
 

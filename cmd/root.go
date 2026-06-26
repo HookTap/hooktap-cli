@@ -13,10 +13,10 @@ import (
 
 // Exit codes are part of the CLI contract so scripts can branch on them.
 const (
-	exitOK         = 0
-	exitError      = 1 // HTTP/network/server error
-	exitUsage      = 2 // bad flags or input
-	exitRateLimit  = 4 // HTTP 429 — retryable
+	exitOK        = 0
+	exitError     = 1 // HTTP/network/server error
+	exitUsage     = 2 // bad flags or input
+	exitRateLimit = 4 // HTTP 429 — retryable
 )
 
 // Persistent flags shared by all subcommands.
@@ -38,9 +38,16 @@ func newRootCmd(b BuildInfo) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "hooktap",
 		Short:         "Send webhook events to the HookTap app from your terminal",
+		Long:          "HookTap sends terminal events to your iPhone. Run without arguments to open the terminal UI, or use subcommands for scripts.",
 		Version:       fmt.Sprintf("%s (commit %s, built %s)", b.Version, b.Commit, b.Date),
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return fmt.Errorf("%w: unknown command %q", errUsage, args[0])
+			}
+			return runTUI(cmd)
+		},
 	}
 	root.SetVersionTemplate("hooktap {{.Version}}\n")
 	root.PersistentFlags().StringVar(&flagURL, "url", "", "base URL override (default https://hooks.hooktap.me)")
@@ -60,6 +67,9 @@ func newRootCmd(b BuildInfo) *cobra.Command {
 	root.AddCommand(newSendCmd())
 	root.AddCommand(newConfigCmd())
 	root.AddCommand(newPingCmd())
+	root.AddCommand(newSetupCmd())
+	root.AddCommand(newTUICmd())
+	root.AddCommand(newWatchCmd())
 	return root
 }
 
@@ -74,9 +84,12 @@ func Execute(b BuildInfo) int {
 
 // exitCodeFor maps an error to its CLI exit code.
 func exitCodeFor(err error) int {
+	var commandErr commandExitError
 	switch {
 	case err == nil:
 		return exitOK
+	case errors.As(err, &commandErr):
+		return commandErr.code
 	case errors.Is(err, errUsage):
 		return exitUsage
 	case errors.Is(err, client.ErrRateLimited):
